@@ -54,8 +54,8 @@ class CloseSet:
         return False
 
 
-def solve(start_state, goal_state, g_func, h_func, is_end_state_func, next_actions_func, next_states_func,
-          state_similarity, max_iters=1000):
+def solve(start_state, goal_state, h_func, is_end_state_func, next_actions_func, next_states_func,
+          state_similarity, g_func=lambda x, y: np.linalg.norm(x-y), max_iters=1000):
     def node(state, parent, action=None):  # !
         # node tuple: state, g, h, parent, action
         if parent is not None:
