@@ -7,7 +7,7 @@ NODE_PARENT_INDEX = 3
 NODE_ACTION_INDEX = 4
 
 
-class OpenSet:
+class __OpenSet:
 
     def __init__(self, threshold):
         self.diff_threshold = np.array(threshold)
@@ -20,7 +20,7 @@ class OpenSet:
 
     def contains(self, node):
         diffs = np.abs(self.points - node[NODE_STATE_INDEX])
-        comps = diffs < self.diff_threshold
+        comps = diffs <= self.diff_threshold
         if np.any(np.logical_and.reduce(comps, axis=1)):
             return True
         return False
@@ -34,7 +34,7 @@ class OpenSet:
         return len(self.nodes)
 
 
-class CloseSet:
+class __CloseSet:
 
     def __init__(self, threshold):
         self.diff_threshold = np.array(threshold)
@@ -48,14 +48,15 @@ class CloseSet:
 
     def contains(self, node):
         diffs = np.abs(self.points - node[NODE_STATE_INDEX])
-        comps = diffs < self.diff_threshold
+        comps = diffs <= self.diff_threshold
         if np.any(np.logical_and.reduce(comps, axis=1)):
             return True
         return False
 
 
-def solve(start_state, goal_state, h_func, is_end_state_func, next_actions_func, next_states_func,
-          state_similarity, g_func=lambda x, y: np.linalg.norm(x-y), max_iters=1000):
+def solve(start_state, goal_state, h_func, next_actions_func, state_similarity=None, g_func=None, is_end_state_func=None,
+          next_states_func=None, max_iters=1000):
+
     def node(state, parent, action=None):  # !
         # node tuple: state, g, h, parent, action
         if parent is not None:
@@ -64,19 +65,32 @@ def solve(start_state, goal_state, h_func, is_end_state_func, next_actions_func,
             p_state, p_g, p_h, p_parent = state, 0., 0., None
         return state, g_func(state, p_state) + p_g, h_func(state, goal_state), parent, action
 
+    start_state = np.array(start_state)
+    goal_state = np.array(goal_state)
+
+    if g_func is None:
+        g_func = lambda x, y: np.linalg.norm(x - y)
+
+    if is_end_state_func is None:
+        is_end_state_func = lambda x: np.all(np.abs(x - goal_state) <= state_similarity)
+
+    if next_states_func is None:
+        next_states_func = lambda s, a: s + a
+
+    if state_similarity is None:
+        state_similarity = np.zeros(start_state.shape)
     state_len = len(start_state)
 
     assert state_len == len(goal_state)
 
-    assert state_similarity
+    assert state_similarity is not None
     if isinstance(state_similarity, float) or isinstance(state_similarity, int):
-        state_similarity = np.ones(state_len)*state_similarity
+        state_similarity = np.ones(state_len) * state_similarity
 
     start = node(start_state, None)
-    goal = node(goal_state, None)
 
-    open_set = OpenSet(state_similarity)
-    close_set = CloseSet(state_similarity)
+    open_set = __OpenSet(state_similarity)
+    close_set = __CloseSet(state_similarity)
 
     open_set.append(start)
 
@@ -84,8 +98,8 @@ def solve(start_state, goal_state, h_func, is_end_state_func, next_actions_func,
 
     num_nodes_searched = 0
 
-    while len(open_set) > 0 and iters < max_iters:
-        fs = [node[NODE_STATE_INDEX] + node[NODE_H_INDEX] for node in open_set.nodes]  # !
+    while len(open_set) > 0:
+        fs = [node[NODE_G_INDEX] + node[NODE_H_INDEX] for node in open_set.nodes]  # !
         lowest_f_index = np.argmin(fs)
 
         current = open_set.pop(lowest_f_index)
@@ -106,6 +120,8 @@ def solve(start_state, goal_state, h_func, is_end_state_func, next_actions_func,
             if not open_set.contains(successor):  # !
                 open_set.append(successor)
 
+        if max_iters <= 0 and iters < max_iters:
+            break
         iters += 1
 
     return start, num_nodes_searched, open_set.nodes, close_set.nodes
