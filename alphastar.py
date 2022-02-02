@@ -120,7 +120,7 @@ def solve(start_state, goal_state, h_func, next_actions_func, state_similarity=N
             if not open_set.contains(successor):  # !
                 open_set.append(successor)
 
-        if max_iters <= 0 and iters < max_iters:
+        if 0 >= max_iters > iters:
             break
         iters += 1
 
